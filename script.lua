@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Strong Stick + Accurate Dodge Detection)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Spawn TP + Fixed Rejoin)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -14,7 +14,11 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- ===================== SETTINGS =====================
 local TELEPORT_OFFSET = CFrame.new(0, 0, -4.5)
 local STICK_STRENGTH = 0.96
-local SAFETY_LIFT = 80   -- Small lift just for clean rejoin timing (not too high)
+local SAFETY_LIFT = 60
+
+-- Your Trainee Spawn Area CFrame
+local TRAINEE_SPAWN_CFRAME = CFrame.new(-2815.68115, 43.2066383, 2076.00244) * 
+                            CFrame.fromOrientation(0, math.rad(13), 0)  -- Cleaned rotation
 -- ===================================================
 
 local selectedNPC = nil
@@ -46,29 +50,29 @@ end
 
 local function getCharacter()
     local char = player.Character or player.CharacterAdded:Wait()
-    return char, char:WaitForChild("HumanoidRootPart", 10)
+    local hrp = char:WaitForChild("HumanoidRootPart", 10)
+    return char, hrp
 end
 
--- ===================== ACCURATE DODGE DETECTION =====================
+-- ===================== DODGE DETECTION =====================
 local function getDodgeCount()
     local main = playerGui:FindFirstChild("Main", true)
     if not main then return 0 end
 
-    local bottomHUD = main:FindFirstChild("BottomHUDList", true)
-    if not bottomHUD then return 0 end
+    local bottom = main:FindFirstChild("BottomHUDList", true)
+    if not bottom then return 0 end
 
-    local universal = bottomHUD:FindFirstChild("UniversalContextButtons", true)
+    local universal = bottom:FindFirstChild("UniversalContextButtons", true)
     if not universal then return 0 end
 
     local kenFrame = universal:FindFirstChild("BoundActionKen")
     if not kenFrame then return 0 end
 
     local label = kenFrame:FindFirstChild("DodgesLeftLabel")
-    if not label then return 0 end   -- Label gone = fully depleted
+    if not label then return 0 end
 
     local text = label.Text or ""
-    local current = tonumber(text:match("^(%d+)"))   -- Gets first number (e.g. 0 from "0/4")
-
+    local current = tonumber(text:match("^(%d+)"))
     return current or 0
 end
 
@@ -129,14 +133,12 @@ local function startStrongStick(hrp)
     end)
 end
 
--- ===================== SHORT SAFETY LIFT =====================
 local function shortSafetyLift(hrp)
     print("Dodges fully depleted → Short lift before rejoin...")
     local safeCFrame = hrp.CFrame * CFrame.new(0, SAFETY_LIFT, 0)
-    local tween = TweenService:Create(hrp, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = safeCFrame})
+    local tween = TweenService:Create(hrp, TweenInfo.new(0.7, Enum.EasingStyle.Quad), {CFrame = safeCFrame})
     tween:Play()
     tween.Completed:Wait()
-    print("✅ Lift complete → Rejoining server")
 end
 
 local function setupAutoRejoin()
@@ -144,13 +146,14 @@ local function setupAutoRejoin()
     
     local queueCode = string.format([[ 
         task.wait(8)
+        print("=== REJOIN: Executing Ken Farm Script ===")
         pcall(function()
             loadstring(game:HttpGet("%s", true))()
         end)
     ]], scriptUrl)
 
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
-    print("✅ Rejoin queue set")
+    print("✅ Rejoin queue registered")
 end
 
 -- ===================== MAIN LOOP =====================
@@ -163,9 +166,15 @@ while true do
     selectTeam()
     local char, hrp = getCharacter()
 
+    -- === FIRST TELEPORT TO TRAINEE SPAWN AREA ===
+    print("Teleporting to Trainee spawn area...")
+    hrp.CFrame = TRAINEE_SPAWN_CFRAME
+
+    task.wait(1.2) -- Small wait for enemies to load
+
     selectedNPC = findClosestTrainee(hrp)
     if not selectedNPC then
-        print("Waiting for Trainee...")
+        print("Waiting for Trainees to spawn...")
         while not findClosestTrainee(hrp) and not isPaused do RunService.Heartbeat:Wait() end
         selectedNPC = findClosestTrainee(hrp)
     end
@@ -178,9 +187,8 @@ while true do
     startStrongStick(hrp)
     turnOnKen()
 
-    print("Farming...")
+    print("Farming Trainees...")
 
-    -- Only exit when dodges are fully 0
     while getDodgeCount() > 0 do
         waitForFocus()
         if not selectedNPC or not selectedNPC.Parent or selectedNPC.Humanoid.Health <= 0 then
@@ -189,7 +197,7 @@ while true do
         RunService.Heartbeat:Wait()
     end
 
-    print("✅ Dodges fully depleted (0) - Starting rejoin...")
+    print("✅ Dodges fully at 0 - Starting rejoin sequence...")
 
     if stickConnection then
         stickConnection:Disconnect()
@@ -197,7 +205,7 @@ while true do
     end
 
     setupAutoRejoin()
-    shortSafetyLift(hrp)      -- Short lift for clean timing
+    shortSafetyLift(hrp)
     
     TeleportService:Teleport(game.PlaceId, player)
 end
