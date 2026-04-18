@@ -1,23 +1,24 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Sticky Target + Focus Monitor)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Smooth Tween + Focus Monitor)
 -- =============================================
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
 local TELEPORT_OFFSET = CFrame.new(0, 0, -4.2)
-local GLUE_STRENGTH = 0.93          -- Smooth & strong sticking
+local TWEEN_SPEED = 0.35          -- Lower = smoother but slower stick (0.25 ~ 0.45 recommended)
 local REJOIN_DELAY = 7
 -- ===================================================
 
 local selectedNPC = nil
-local stickConnection = nil
+local currentTween = nil
 local isPaused = false
 local focusConnection = nil
 
@@ -33,7 +34,7 @@ local function monitorFocus()
         if not currentlyActive and not isPaused then
             isPaused = true
             print("⚠️ Window lost focus - Pausing script")
-            if stickConnection then stickConnection:Disconnect() end
+            if currentTween then currentTween:Cancel() end
         elseif currentlyActive and isPaused then
             isPaused = false
             print("✅ Window regained focus - Resuming script")
@@ -106,8 +107,7 @@ end
 -- ===================== TARGETING (TRAINEES ONLY) =====================
 local function isTrainee(enemy)
     if not enemy or not enemy.Name then return false end
-    local name = enemy.Name:lower()
-    return name:find("trainee") or name:find("trainee%s") 
+    return enemy.Name:lower():find("trainee")
 end
 
 local function findClosestTrainee(hrp)
@@ -128,16 +128,27 @@ local function findClosestTrainee(hrp)
     return closest
 end
 
-local function startGluedFollow(hrp)
-    if stickConnection then stickConnection:Disconnect() end
-    
-    stickConnection = RunService.Heartbeat:Connect(function()
-        if isPaused or not selectedNPC then return end
-        local root = selectedNPC:FindFirstChild("HumanoidRootPart")
-        local hum = selectedNPC:FindFirstChild("Humanoid")
-        if root and hum and hum.Health > 0 then
-            local targetCFrame = root.CFrame * TELEPORT_OFFSET
-            hrp.CFrame = hrp.CFrame:Lerp(targetCFrame, GLUE_STRENGTH)
+-- ===================== SMOOTH TWEEN FOLLOW =====================
+local function startTweenFollow(hrp)
+    if currentTween then currentTween:Cancel() end
+
+    local tweenInfo = TweenInfo.new(TWEEN_SPEED, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
+
+    spawn(function()
+        while selectedNPC and getDodgeCount() > 0 and not isPaused do
+            local root = selectedNPC:FindFirstChild("HumanoidRootPart")
+            local hum = selectedNPC:FindFirstChild("Humanoid")
+            
+            if root and hum and hum.Health > 0 then
+                local targetCFrame = root.CFrame * TELEPORT_OFFSET
+                
+                currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+                currentTween:Play()
+                currentTween.Completed:Wait()
+            else
+                break
+            end
+            RunService.Heartbeat:Wait()
         end
     end)
 end
@@ -157,24 +168,22 @@ local function setupAutoRejoin()
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
 end
 
--- ===================== START FOCUS MONITOR =====================
+-- ===================== START =====================
 monitorFocus()
 
--- ===================== MAIN FARM LOOP =====================
 while true do
     if isPaused then
         repeat RunService.Heartbeat:Wait() until not isPaused
     end
     
-    print("Starting new farm cycle... (Trainee Only Mode)")
+    print("Starting new farm cycle... (Trainee Only + Tween)")
     
     selectTeam()
     local char, hrp = getCharacter()
     
-    -- Select and lock onto a Trainee
     selectedNPC = findClosestTrainee(hrp)
     if not selectedNPC then
-        print("No Trainees found nearby, waiting...")
+        print("Waiting for Trainees...")
         waitUntil(function() 
             if isPaused then return false end
             return findClosestTrainee(hrp) ~= nil 
@@ -188,38 +197,33 @@ while true do
     end
     
     turnOnKen()
-    startGluedFollow(hrp)
+    startTweenFollow(hrp)
     
-    print("Ken Haki Activated - Farming Trainees")
+    print("Ken Haki Activated - Smooth Tween Farming")
     
     while getDodgeCount() > 0 do
         if isPaused then
-            if stickConnection then stickConnection:Disconnect() end
+            if currentTween then currentTween:Cancel() end
             repeat RunService.Heartbeat:Wait() until not isPaused
-            startGluedFollow(hrp)
+            startTweenFollow(hrp)
         end
         
-        -- Check if current Trainee died
         if not selectedNPC or not selectedNPC.Parent or 
-           not selectedNPC:FindFirstChild("Humanoid") or 
-           selectedNPC.Humanoid.Health <= 0 then
+           not selectedNPC:FindFirstChild("Humanoid") or selectedNPC.Humanoid.Health <= 0 then
             
             selectedNPC = findClosestTrainee(hrp)
             if selectedNPC then
-                print("Current Trainee died → Locked onto new one:", selectedNPC.Name)
+                print("Switched to new Trainee:", selectedNPC.Name)
+                if currentTween then currentTween:Cancel() end
+                startTweenFollow(hrp)
             end
         end
-        
         RunService.Heartbeat:Wait()
     end
     
-    print("Dodges depleted - Rejoining server...")
+    print("Dodges depleted - Rejoining...")
     
-    if stickConnection then
-        stickConnection:Disconnect()
-        stickConnection = nil
-    end
-    
+    if currentTween then currentTween:Cancel() end
     setupAutoRejoin()
     task.wait(1.8)
     TeleportService:Teleport(game.PlaceId, player)
