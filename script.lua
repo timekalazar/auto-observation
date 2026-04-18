@@ -1,18 +1,3 @@
--- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Spawn TP + POTASSIUM REJOIN FIX v2)
--- =============================================
--- ✅ FIXED FOR YOUR EXACT ISSUE (April 2026)
--- Root cause (after deep research on Potassium + common Blox Fruits server-hop failures):
---   • Potassium supports queue_on_teleport perfectly (global function is used in 99% of working scripts).
---   • The problem is TIMING: After TeleportService:Teleport, Roblox takes 8–25+ seconds to fully load into the game + show the menu/ChooseTeam + spawn character + load PlayerGui.
---   • Your tip confirmed it: The script only works when you are "already in the menu and fully loaded in".
---   • Previous queued code was running too early → partial game state → script fails silently or crashes early.
---   • Fix: Ultra-heavy waiting in the queued loader (game.Loaded + 20-second buffer + character + PlayerGui + Main HUD ready).
---   • Added detailed console spam so you can see exactly where it is after every rejoin.
--- =============================================
-
-print("✅ Ken Haki Auto-Farm Script EXECUTED (Potassium full-load rejoin version)")
-
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
@@ -23,9 +8,9 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
-local TELEPORT_OFFSET = CFrame.new(0, 0, -4)
+local TELEPORT_OFFSET = CFrame.new(0, 0, -3)
 local STICK_STRENGTH = 0.96
-local SAFETY_LIFT = 60
+local SAFETY_LIFT = 30
 
 local TRAINEE_SPAWN_CFRAME = CFrame.new(-2815.68115, 43.2066383, 2076.00244) * 
                             CFrame.fromOrientation(0, math.rad(13), 0)
@@ -286,6 +271,4 @@ while true do
     
     print("🚀 Teleporting to new server... (rejoin loader will handle full reload)")
     TeleportService:Teleport(game.PlaceId, player)
-    
-    task.wait(15) -- Extra safety
 end
