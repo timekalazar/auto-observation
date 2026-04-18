@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Silent + Focus Monitor + Sticky Target)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Sticky Target + Focus Monitor)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -12,7 +12,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
 local TELEPORT_OFFSET = CFrame.new(0, 0, -4.2)
-local GLUE_STRENGTH = 0.92          -- Higher = smoother & stronger stick
+local GLUE_STRENGTH = 0.93          -- Smooth & strong sticking
 local REJOIN_DELAY = 7
 -- ===================================================
 
@@ -103,16 +103,25 @@ local function getDodgeCount()
     return 0
 end
 
-local function findClosestEnemy(hrp)
+-- ===================== TARGETING (TRAINEES ONLY) =====================
+local function isTrainee(enemy)
+    if not enemy or not enemy.Name then return false end
+    local name = enemy.Name:lower()
+    return name:find("trainee") or name:find("trainee%s") 
+end
+
+local function findClosestTrainee(hrp)
     local closest, dist = nil, math.huge
     for _, enemy in ipairs(workspace.Enemies:GetChildren()) do
-        local root = enemy:FindFirstChild("HumanoidRootPart")
-        local hum = enemy:FindFirstChild("Humanoid")
-        if root and hum and hum.Health > 0 then
-            local d = (root.Position - hrp.Position).Magnitude
-            if d < dist then
-                dist = d
-                closest = enemy
+        if isTrainee(enemy) then
+            local root = enemy:FindFirstChild("HumanoidRootPart")
+            local hum = enemy:FindFirstChild("Humanoid")
+            if root and hum and hum.Health > 0 then
+                local d = (root.Position - hrp.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = enemy
+                end
             end
         end
     end
@@ -157,32 +166,32 @@ while true do
         repeat RunService.Heartbeat:Wait() until not isPaused
     end
     
-    print("Starting new farm cycle...")
+    print("Starting new farm cycle... (Trainee Only Mode)")
     
     selectTeam()
     local char, hrp = getCharacter()
     
-    -- === SELECT AND LOCK TARGET ===
-    selectedNPC = findClosestEnemy(hrp)
+    -- Select and lock onto a Trainee
+    selectedNPC = findClosestTrainee(hrp)
     if not selectedNPC then
+        print("No Trainees found nearby, waiting...")
         waitUntil(function() 
             if isPaused then return false end
-            return findClosestEnemy(hrp) ~= nil 
-        end, 15)
-        selectedNPC = findClosestEnemy(hrp)
+            return findClosestTrainee(hrp) ~= nil 
+        end, 20)
+        selectedNPC = findClosestTrainee(hrp)
     end
     
     if selectedNPC then
-        print("Locked onto enemy:", selectedNPC.Name)
+        print("✅ Locked onto Trainee:", selectedNPC.Name)
         hrp.CFrame = selectedNPC.HumanoidRootPart.CFrame * TELEPORT_OFFSET
     end
     
     turnOnKen()
     startGluedFollow(hrp)
     
-    print("✅ Ken Haki Activated - Sticking to target")
+    print("Ken Haki Activated - Farming Trainees")
     
-    -- Farm until dodges run out
     while getDodgeCount() > 0 do
         if isPaused then
             if stickConnection then stickConnection:Disconnect() end
@@ -190,14 +199,14 @@ while true do
             startGluedFollow(hrp)
         end
         
-        -- Only change target if current one died
+        -- Check if current Trainee died
         if not selectedNPC or not selectedNPC.Parent or 
            not selectedNPC:FindFirstChild("Humanoid") or 
            selectedNPC.Humanoid.Health <= 0 then
             
-            selectedNPC = findClosestEnemy(hrp)
+            selectedNPC = findClosestTrainee(hrp)
             if selectedNPC then
-                print("Current target died, locked onto new enemy:", selectedNPC.Name)
+                print("Current Trainee died → Locked onto new one:", selectedNPC.Name)
             end
         end
         
