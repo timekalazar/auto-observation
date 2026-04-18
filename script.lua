@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Silent + Max Efficiency)
+-- Blox Fruits Ken Haki Auto Farm (Silent + Fixed)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -52,7 +52,7 @@ local function selectTeam()
             local btn = gui.ChooseTeam.Container.Marines.Frame:FindFirstChild("TextButton")
             if btn then
                 firesignal(btn.Activated)
-                waitUntil(function() return not gui:FindFirstChild("ChooseTeam") end, 6)
+                waitUntil(function() return not gui:FindFirstChild("ChooseTeam") end, 8)
                 return
             end
         else
@@ -68,9 +68,13 @@ local function getCharacter()
 end
 
 local function turnOnKen()
-    VirtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    RunService.Heartbeat:Wait()
-    VirtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    -- More reliable Ken activation
+    for i = 1, 2 do
+        VirtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        RunService.Heartbeat:Wait()
+        VirtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        RunService.Heartbeat:Wait()
+    end
 end
 
 local function getDodgeCount()
@@ -111,7 +115,7 @@ local function startGluedFollow(hrp)
 end
 
 local function setupAutoRejoin()
-    local scriptUrl = "https://raw.githubusercontent.com/timekalazar/auto-observation/refs/heads/main/script.lua"   -- ← REPLACE WITH YOUR RAW LINK
+    local scriptUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/kenfarm.lua"   -- ← CHANGE THIS
     local queueCode = [[task.wait(4); loadstring(game:HttpGet("]] .. scriptUrl .. [[", true))()]]
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
 end
@@ -143,7 +147,8 @@ while true do
 
     if stickConnection then stickConnection:Disconnect() end
     setupAutoRejoin()
-    task.wait(0.8)
+    
+    task.wait(0.6)
     TeleportService:Teleport(game.PlaceId, player)
     
     task.wait(15)
