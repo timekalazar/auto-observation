@@ -111,7 +111,7 @@ local function startGluedFollow(hrp)
 end
 
 local function setupAutoRejoin()
-    local scriptUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/kenfarm.lua"   -- ← REPLACE WITH YOUR RAW LINK
+    local scriptUrl = "https://raw.githubusercontent.com/timekalazar/auto-observation/refs/heads/main/script.lua"   -- ← REPLACE WITH YOUR RAW LINK
     local queueCode = [[task.wait(4); loadstring(game:HttpGet("]] .. scriptUrl .. [[", true))()]]
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
 end
