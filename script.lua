@@ -1,7 +1,7 @@
 -- =============================================
 -- Blox Fruits Ken Haki Auto Farm (Trainee Only + Spawn TP + Fixed Rejoin)
 -- =============================================
-
+print("executed")
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
@@ -12,7 +12,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
-local TELEPORT_OFFSET = CFrame.new(0, 0, -4.5)
+local TELEPORT_OFFSET = CFrame.new(0, 0, -4)
 local STICK_STRENGTH = 0.96
 local SAFETY_LIFT = 60
 
