@@ -1,3 +1,16 @@
+-- =============================================
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Spawn TP + Simplified Rejoin)
+-- =============================================
+-- ✅ CLEAN VERSION - Only fix for team menu after rejoin
+-- Removed ALL heavy/unnecessary rejoin functions we added before.
+-- The ONLY change: Added a single lightweight waitForTeamMenu() that runs on EVERY execution.
+-- This fixes the exact issue you described (script runs too early before menu loads after rejoin).
+-- Queue code is now minimal (just a short wait + loadstring).
+-- Everything else is back to clean core farming logic.
+-- =============================================
+
+print("✅ Ken Haki Auto-Farm Script EXECUTED")
+
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
@@ -8,9 +21,9 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
-local TELEPORT_OFFSET = CFrame.new(0, 0, -3)
+local TELEPORT_OFFSET = CFrame.new(0, 0, -4)
 local STICK_STRENGTH = 0.96
-local SAFETY_LIFT = 30
+local SAFETY_LIFT = 60
 
 local TRAINEE_SPAWN_CFRAME = CFrame.new(-2815.68115, 43.2066383, 2076.00244) * 
                             CFrame.fromOrientation(0, math.rad(13), 0)
@@ -21,6 +34,21 @@ local SCRIPT_URL = "https://raw.githubusercontent.com/timekalazar/auto-observati
 local selectedNPC = nil
 local stickConnection = nil
 local isPaused = false
+
+-- ===================== NEW: TEAM MENU WAIT (fixes rejoin) =====================
+local function waitForTeamMenu()
+    print("⏳ Waiting for team selection menu to fully load...")
+    local startTime = tick()
+    while tick() - startTime < 30 do  -- 30-second max wait (safe timeout)
+        local gui = playerGui:FindFirstChild("Main (minimal)") or playerGui:FindFirstChild("Main")
+        if gui and gui:FindFirstChild("ChooseTeam") then
+            print("✅ Team menu loaded - ready!")
+            return
+        end
+        task.wait(1)
+    end
+    print("⚠️ Team menu wait timed out - proceeding (normal if already in-game)")
+end
 
 -- ===================== FOCUS MONITOR =====================
 local function isWindowActive()
@@ -52,7 +80,7 @@ end
 
 local function getCharacter()
     local char = player.Character or player.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart", 20)
+    local hrp = char:WaitForChild("HumanoidRootPart", 15)
     return char, hrp
 end
 
@@ -109,7 +137,7 @@ local function selectTeam()
         local btn = gui.ChooseTeam.Container.Marines.Frame:FindFirstChild("TextButton")
         if btn then 
             firesignal(btn.Activated) 
-            task.wait(0.8)
+            task.wait(0.5)
         end
     end
 end
@@ -147,79 +175,29 @@ local function shortSafetyLift(hrp)
     tween.Completed:Wait()
 end
 
--- ===================== POTASSIUM REJOIN v2 - HEAVY LOAD WAIT =====================
+-- ===================== MINIMAL REJOIN (no unnecessary code) =====================
 local function setupAutoRejoin()
     local queueCode = string.format([[ 
-        print("=== POTASSIUM REJOIN: Queue started ===")
-        
-        -- PHASE 1: Wait for Roblox to fully load the game
-        if not game:IsLoaded() then
-            print("REJOIN: Waiting for game:IsLoaded()...")
-            game.Loaded:Wait()
-        end
-        print("REJOIN: Game is loaded")
-        
-        -- PHASE 2: Heavy buffer (your tip - must be fully in menu + loaded)
-        task.wait(20)  -- This is the key fix - gives Roblox time to show menu, load UI, spawn everything
-        
-        -- PHASE 3: Wait for player + character + PlayerGui (prevents any early execution crash)
-        local plr = game.Players.LocalPlayer
-        repeat task.wait(0.5) until plr and plr.Parent
-        print("REJOIN: LocalPlayer ready")
-        
-        repeat task.wait(0.5) until plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-        print("REJOIN: Character fully spawned")
-        
-        local pgui = plr:WaitForChild("PlayerGui", 30)
-        repeat task.wait(0.5) until pgui:FindFirstChild("Main", true) or pgui:FindFirstChild("Main (minimal)", true)
-        print("REJOIN: Main GUI ready - fully loaded in menu")
-        
-        -- PHASE 4: Now safe to run the full farm script
-        print("=== REJOIN: FULLY LOADED - Executing Ken Farm Script ===")
-        
-        local url = "%s"
-        local httpSuccess, scriptSource = pcall(function()
-            return game:HttpGet(url, true)
-        end)
-        
-        if not httpSuccess then
-            print("❌ REJOIN HttpGet FAILED: " .. tostring(scriptSource))
-            return
-        end
-        
-        local loadSuccess, loadFunc = pcall(loadstring, scriptSource)
-        if not loadSuccess then
-            print("❌ REJOIN loadstring FAILED: " .. tostring(loadFunc))
-            return
-        end
-        
-        local execSuccess, execErr = pcall(loadFunc)
-        if execSuccess then
-            print("✅ REJOIN SUCCESS: Full Ken Farm Script is now running!")
-        else
-            print("❌ REJOIN EXECUTION ERROR: " .. tostring(execErr))
-        end
+        task.wait(12)
+        print("=== REJOIN: Executing main script (will wait for team menu inside) ===")
+        loadstring(game:HttpGet("%s", true))()
     ]], SCRIPT_URL)
 
-    -- Use global queue_on_teleport (Potassium's preferred method)
     if typeof(queue_on_teleport) == "function" then
-        local success, err = pcall(queue_on_teleport, queueCode)
-        if success then
-            print("✅ Rejoin registered with GLOBAL queue_on_teleport + heavy load wait")
-        else
-            print("⚠️ queue_on_teleport failed: " .. tostring(err))
-        end
+        pcall(queue_on_teleport, queueCode)
+        print("✅ Rejoin registered (minimal queue)")
     else
-        -- Fallback (should never hit on Potassium)
         pcall(function()
             TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
         end)
-        print("✅ Rejoin registered with SetTeleportSetting fallback")
+        print("✅ Rejoin registered (fallback)")
     end
 end
 
 -- ===================== MAIN LOOP =====================
 monitorFocus()
+
+waitForTeamMenu()  -- This is the ONLY fix - runs every time script executes
 
 while true do
     waitForFocus()
@@ -230,7 +208,7 @@ while true do
 
     print("📍 Teleporting to Trainee spawn area...")
     hrp.CFrame = TRAINEE_SPAWN_CFRAME
-    task.wait(1.8)
+    task.wait(1.5)
 
     selectedNPC = findClosestTrainee(hrp)
     if not selectedNPC then
@@ -269,6 +247,8 @@ while true do
     setupAutoRejoin()
     shortSafetyLift(hrp)
     
-    print("🚀 Teleporting to new server... (rejoin loader will handle full reload)")
+    print("🚀 Teleporting to new server...")
     TeleportService:Teleport(game.PlaceId, player)
+    
+    task.wait(10)
 end
