@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Smooth + FIXED REJOIN)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Strong Stick + Safe Tween Rejoin)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -12,17 +12,17 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
-local TELEPORT_OFFSET = CFrame.new(0, 0, -4.2)
-local TWEEN_SPEED = 0.32
-local REJOIN_DELAY = 9   -- Increased for stability
+local TELEPORT_OFFSET = CFrame.new(0, 0, -4.5)
+local STICK_STRENGTH = 0.96
+local SAFETY_HEIGHT = 300   -- High up in the air (safe zone)
 -- ===================================================
 
 local selectedNPC = nil
-local currentTween = nil
+local stickConnection = nil
 local isPaused = false
 local focusConnection = nil
 
--- ===================== FOCUS MONITOR =====================
+-- ===================== FOCUS =====================
 local function isWindowActive()
     return (isrbxactive and isrbxactive()) or true
 end
@@ -34,7 +34,7 @@ local function monitorFocus()
         if not active and not isPaused then
             isPaused = true
             print("⚠️ WINDOW LOST FOCUS → Paused")
-            if currentTween then currentTween:Cancel() end
+            if stickConnection then stickConnection:Disconnect() end
         elseif active and isPaused then
             isPaused = false
             print("✅ FOCUS RETURNED → Resuming")
@@ -44,12 +44,6 @@ end
 
 local function waitForFocus()
     while isPaused do RunService.Heartbeat:Wait() end
-end
-
-local function waitUntil(condition)
-    while not condition() and not isPaused do
-        RunService.Heartbeat:Wait()
-    end
 end
 
 local function getCharacter()
@@ -67,7 +61,7 @@ local function getDodgeCount()
     return 0
 end
 
--- ===================== TRAINEE TARGETING =====================
+-- ===================== TARGETING =====================
 local function isTrainee(enemy)
     return enemy and enemy.Name and enemy.Name:lower():find("trainee") ~= nil
 end
@@ -102,54 +96,57 @@ end
 local function turnOnKen()
     waitForFocus()
     print("Activating Ken Haki...")
-    for _ = 1, 8 do
+    for _ = 1, 10 do
         waitForFocus()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
         RunService.Heartbeat:Wait()
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         RunService.Heartbeat:Wait()
     end
+    print("Ken Haki activation complete")
 end
 
-local function startSmoothFollow(hrp)
-    if currentTween then currentTween:Cancel() end
-
-    spawn(function()
-        while selectedNPC and getDodgeCount() > 0 and not isPaused do
-            waitForFocus()
-            local root = selectedNPC:FindFirstChild("HumanoidRootPart")
-            local hum = selectedNPC:FindFirstChild("Humanoid")
-            if root and hum and hum.Health > 0 then
-                local target = root.CFrame * TELEPORT_OFFSET
-                currentTween = TweenService:Create(hrp, TweenInfo.new(TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = target})
-                currentTween:Play()
-                currentTween.Completed:Wait()
-            else
-                break
-            end
+-- ===================== STRONG STICK =====================
+local function startStrongStick(hrp)
+    if stickConnection then stickConnection:Disconnect() end
+    stickConnection = RunService.Heartbeat:Connect(function()
+        if isPaused or not selectedNPC then return end
+        local root = selectedNPC:FindFirstChild("HumanoidRootPart")
+        local hum = selectedNPC:FindFirstChild("Humanoid")
+        if root and hum and hum.Health > 0 then
+            local targetCFrame = root.CFrame * TELEPORT_OFFSET
+            hrp.CFrame = hrp.CFrame:Lerp(targetCFrame, STICK_STRENGTH)
         end
     end)
 end
 
--- ===================== IMPROVED REJOIN SYSTEM =====================
+-- ===================== SAFE TWEEN TO HEIGHT =====================
+local function tweenToSafety(hrp)
+    print("Dodges depleted → Moving to safe height before rejoin...")
+    
+    local safeCFrame = CFrame.new(hrp.Position.X, SAFETY_HEIGHT, hrp.Position.Z) * CFrame.Angles(0, math.rad(90), 0)
+    
+    local tween = TweenService:Create(hrp, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = safeCFrame})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    print("✅ Reached safe height. Rejoining now...")
+end
+
+-- ===================== REJOIN =====================
 local function setupAutoRejoin()
     local scriptUrl = "https://raw.githubusercontent.com/timekalazar/auto-observation/refs/heads/main/script.lua"
     
     local queueCode = [[
-        task.wait(]] .. REJOIN_DELAY .. [[)
-        print("=== Auto Rejoin Triggered - Loading Script ===")
-        local success, err = pcall(function()
+        task.wait(8)
+        print("=== REJOIN: Loading Ken Haki Farm Script ===")
+        pcall(function()
             loadstring(game:HttpGet("]] .. scriptUrl .. [[", true))()
         end)
-        if success then
-            print("✅ Ken Haki Farm Script Loaded Successfully After Rejoin")
-        else
-            warn("❌ Failed to load script: " .. tostring(err))
-        end
     ]]
-
+    
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
-    print("✅ Rejoin queue has been SET with your script link")
+    print("✅ Rejoin queue registered")
 end
 
 -- ===================== MAIN LOOP =====================
@@ -157,7 +154,7 @@ monitorFocus()
 
 while true do
     waitForFocus()
-    print("=== NEW FARM CYCLE ===")
+    print("=== NEW FARM CYCLE STARTED ===")
 
     selectTeam()
     local char, hrp = getCharacter()
@@ -165,47 +162,36 @@ while true do
     selectedNPC = findClosestTrainee(hrp)
     if not selectedNPC then
         print("Waiting for Trainee...")
-        waitUntil(function() return findClosestTrainee(hrp) ~= nil end)
+        while not findClosestTrainee(hrp) and not isPaused do RunService.Heartbeat:Wait() end
         selectedNPC = findClosestTrainee(hrp)
     end
 
     if selectedNPC then
-        print("✅ Locked onto:", selectedNPC.Name)
+        print("✅ LOCKED ONTO:", selectedNPC.Name)
         hrp.CFrame = selectedNPC.HumanoidRootPart.CFrame * TELEPORT_OFFSET
     end
 
-    startSmoothFollow(hrp)
+    startStrongStick(hrp)
     turnOnKen()
 
-    print("Farming... Waiting for dodges to run out")
+    print("Farming Trainees...")
 
     while getDodgeCount() > 0 do
         waitForFocus()
         if not selectedNPC or not selectedNPC.Parent or selectedNPC.Humanoid.Health <= 0 then
             selectedNPC = findClosestTrainee(hrp)
-            if selectedNPC then
-                print("Switched to new Trainee:", selectedNPC.Name)
-                if currentTween then currentTween:Cancel() end
-                startSmoothFollow(hrp)
-            end
         end
         RunService.Heartbeat:Wait()
     end
 
-    -- ==================== REJOIN SECTION ====================
-    print("Dodges depleted → Preparing to rejoin...")
-
-    if currentTween then 
-        currentTween:Cancel() 
-        currentTween = nil 
+    -- ==================== SAFE EXIT & REJOIN ====================
+    if stickConnection then
+        stickConnection:Disconnect()
+        stickConnection = nil
     end
 
     setupAutoRejoin()
+    tweenToSafety(hrp)          -- Smoothly go high up first
     
-    task.wait(2)                    -- Give time for queue to register
     TeleportService:Teleport(game.PlaceId, player)
-    
-    task.wait(3)
-    -- Fallback if teleport fails
-    game:Shutdown()
 end
