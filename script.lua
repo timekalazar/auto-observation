@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Strong Stick + Fixed Rejoin)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Strong Stick + Correct Dodge Detection)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -49,18 +49,28 @@ local function getCharacter()
     return char, char:WaitForChild("HumanoidRootPart", 10)
 end
 
--- ===================== DODGE DETECTION (Fixed) =====================
+-- ===================== CORRECT DODGE DETECTION =====================
 local function getDodgeCount()
-    local main = playerGui:FindFirstChild("Main", true) or playerGui:FindFirstChild("Main (minimal)", true)
-    if not main then return 0 end
+    local bottomHUD = playerGui:FindFirstChild("Main", true)
+    if not bottomHUD then return 0 end
     
-    local label = main:FindFirstChild("DodgesLeftLabel", true)
-    if not label then return 0 end  -- Label gone = dodges depleted
+    local kenButton = bottomHUD:FindFirstChild("BottomHUDList", true)
+    if not kenButton then return 0 end
+    
+    local boundAction = kenButton:FindFirstChild("UniversalContextButtons", true)
+    if not boundAction then return 0 end
+    
+    local kenFrame = boundAction:FindFirstChild("BoundActionKen")
+    if not kenFrame then return 0 end
+    
+    local label = kenFrame:FindFirstChild("DodgesLeftLabel")
+    if not label then return 0 end   -- Label gone = depleted
     
     local text = label.Text or ""
-    local num = tonumber(text:match("^(%d+)"))  -- Gets the number before any "/"
     
-    return num or 0
+    -- Extract number from "4/4", "0/4", "3/5", etc.
+    local current = tonumber(text:match("^(%d+)"))
+    return current or 0
 end
 
 -- ===================== TARGETING =====================
@@ -105,6 +115,7 @@ local function turnOnKen()
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         RunService.Heartbeat:Wait()
     end
+    print("Ken Haki activation complete")
 end
 
 local function startStrongStick(hrp)
@@ -120,31 +131,30 @@ local function startStrongStick(hrp)
 end
 
 local function tweenToSafety(hrp)
-    print("Dodges depleted → Flying to safe height...")
+    print("Dodges depleted → Moving to safe height...")
     local safeCFrame = CFrame.new(hrp.Position.X, SAFETY_HEIGHT, hrp.Position.Z)
-    local tween = TweenService:Create(hrp, TweenInfo.new(1.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = safeCFrame})
+    local tween = TweenService:Create(hrp, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = safeCFrame})
     tween:Play()
     tween.Completed:Wait()
-    print("✅ Safe height reached - Rejoining now")
+    print("✅ Safe height reached → Rejoining")
 end
 
--- ===================== REJOIN (Clean String) =====================
 local function setupAutoRejoin()
     local scriptUrl = "https://raw.githubusercontent.com/timekalazar/auto-observation/refs/heads/main/script.lua"
     
     local queueCode = string.format([[ 
         task.wait(8)
-        print("=== REJOIN LOADING SCRIPT ===")
+        print("=== REJOIN: Loading Ken Farm Script ===")
         pcall(function()
             loadstring(game:HttpGet("%s", true))()
         end)
     ]], scriptUrl)
 
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
-    print("✅ Rejoin queue has been set")
+    print("✅ Rejoin queue set")
 end
 
--- ===================== START =====================
+-- ===================== MAIN LOOP =====================
 monitorFocus()
 
 while true do
@@ -169,18 +179,19 @@ while true do
     startStrongStick(hrp)
     turnOnKen()
 
-    print("Farming...")
+    print("Farming... Monitoring dodges")
 
     while getDodgeCount() > 0 do
         waitForFocus()
+        
         if not selectedNPC or not selectedNPC.Parent or selectedNPC.Humanoid.Health <= 0 then
             selectedNPC = findClosestTrainee(hrp)
         end
+        
         RunService.Heartbeat:Wait()
     end
 
-    -- ==================== REJOIN SEQUENCE ====================
-    print("Dodges depleted - Starting safe rejoin...")
+    print("✅ Dodges depleted detected - Starting safe rejoin...")
 
     if stickConnection then
         stickConnection:Disconnect()
