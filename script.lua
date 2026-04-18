@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Strong Stick + Reliable Rejoin)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Strong Stick + Fixed Rejoin)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -20,7 +20,6 @@ local SAFETY_HEIGHT = 350
 local selectedNPC = nil
 local stickConnection = nil
 local isPaused = false
-local focusConnection = nil
 
 -- ===================== FOCUS =====================
 local function isWindowActive()
@@ -28,8 +27,7 @@ local function isWindowActive()
 end
 
 local function monitorFocus()
-    if focusConnection then focusConnection:Disconnect() end
-    focusConnection = RunService.Heartbeat:Connect(function()
+    RunService.Heartbeat:Connect(function()
         local active = isWindowActive()
         if not active and not isPaused then
             isPaused = true
@@ -48,30 +46,21 @@ end
 
 local function getCharacter()
     local char = player.Character or player.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart", 10)
-    return char, hrp
+    return char, char:WaitForChild("HumanoidRootPart", 10)
 end
 
--- ===================== IMPROVED DODGE COUNTER =====================
+-- ===================== DODGE DETECTION (Fixed) =====================
 local function getDodgeCount()
-    -- Try multiple possible paths
     local main = playerGui:FindFirstChild("Main", true) or playerGui:FindFirstChild("Main (minimal)", true)
     if not main then return 0 end
     
     local label = main:FindFirstChild("DodgesLeftLabel", true)
-    if not label or not label.Text then return 0 end
+    if not label then return 0 end  -- Label gone = dodges depleted
     
-    local text = label.Text
+    local text = label.Text or ""
+    local num = tonumber(text:match("^(%d+)"))  -- Gets the number before any "/"
     
-    -- Handle formats like "3/3", "0/3", "12/12", etc.
-    local current = tonumber(text:match("^(%d+)"))   -- First number
-    local max     = tonumber(text:match("/(%d+)$"))  -- Number after /
-    
-    if current then
-        return current
-    end
-    
-    return 0
+    return num or 0
 end
 
 -- ===================== TARGETING =====================
@@ -116,7 +105,6 @@ local function turnOnKen()
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         RunService.Heartbeat:Wait()
     end
-    print("Ken Haki activation complete")
 end
 
 local function startStrongStick(hrp)
@@ -126,38 +114,37 @@ local function startStrongStick(hrp)
         local root = selectedNPC:FindFirstChild("HumanoidRootPart")
         local hum = selectedNPC:FindFirstChild("Humanoid")
         if root and hum and hum.Health > 0 then
-            local targetCFrame = root.CFrame * TELEPORT_OFFSET
-            hrp.CFrame = hrp.CFrame:Lerp(targetCFrame, STICK_STRENGTH)
+            hrp.CFrame = hrp.CFrame:Lerp(root.CFrame * TELEPORT_OFFSET, STICK_STRENGTH)
         end
     end)
 end
 
 local function tweenToSafety(hrp)
-    print("Dodges depleted → Moving to safe height...")
-    local safePos = Vector3.new(hrp.Position.X, SAFETY_HEIGHT, hrp.Position.Z)
-    local tween = TweenService:Create(hrp, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
-                {CFrame = CFrame.new(safePos)})
+    print("Dodges depleted → Flying to safe height...")
+    local safeCFrame = CFrame.new(hrp.Position.X, SAFETY_HEIGHT, hrp.Position.Z)
+    local tween = TweenService:Create(hrp, TweenInfo.new(1.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = safeCFrame})
     tween:Play()
     tween.Completed:Wait()
-    print("✅ Safe height reached → Rejoining")
+    print("✅ Safe height reached - Rejoining now")
 end
 
--- ===================== REJOIN =====================
+-- ===================== REJOIN (Clean String) =====================
 local function setupAutoRejoin()
     local scriptUrl = "https://raw.githubusercontent.com/timekalazar/auto-observation/refs/heads/main/script.lua"
     
-    local queueCode = [[
+    local queueCode = string.format([[ 
         task.wait(8)
+        print("=== REJOIN LOADING SCRIPT ===")
         pcall(function()
-            loadstring(game:HttpGet("]] .. scriptUrl .. [[", true))()
+            loadstring(game:HttpGet("%s", true))()
         end)
-    ]]
-    
+    ]], scriptUrl)
+
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
-    print("✅ Rejoin queue registered")
+    print("✅ Rejoin queue has been set")
 end
 
--- ===================== MAIN LOOP =====================
+-- ===================== START =====================
 monitorFocus()
 
 while true do
@@ -182,18 +169,10 @@ while true do
     startStrongStick(hrp)
     turnOnKen()
 
-    print("Farming... (Waiting for dodges to reach 0)")
+    print("Farming...")
 
-    -- Main farming loop
-    while true do
+    while getDodgeCount() > 0 do
         waitForFocus()
-        local dodges = getDodgeCount()
-        print("Current dodges:", dodges)   -- Debug print so you can see what it detects
-        
-        if dodges <= 0 then
-            break
-        end
-
         if not selectedNPC or not selectedNPC.Parent or selectedNPC.Humanoid.Health <= 0 then
             selectedNPC = findClosestTrainee(hrp)
         end
@@ -201,7 +180,7 @@ while true do
     end
 
     -- ==================== REJOIN SEQUENCE ====================
-    print("Dodges reached 0 → Starting safe exit...")
+    print("Dodges depleted - Starting safe rejoin...")
 
     if stickConnection then
         stickConnection:Disconnect()
@@ -209,7 +188,7 @@ while true do
     end
 
     setupAutoRejoin()
-    tweenToSafety(hrp)     -- Go high up safely
+    tweenToSafety(hrp)
     
     TeleportService:Teleport(game.PlaceId, player)
 end
