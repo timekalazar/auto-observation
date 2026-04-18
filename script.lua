@@ -1,5 +1,5 @@
 -- =============================================
--- Blox Fruits Ken Haki Auto Farm (Trainee Only + Smooth Tween + Focus Monitor)
+-- Blox Fruits Ken Haki Auto Farm (Trainee Only + Smooth Tween + Reliable Rejoin)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -13,8 +13,8 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- ===================== SETTINGS =====================
 local TELEPORT_OFFSET = CFrame.new(0, 0, -4.2)
-local TWEEN_SPEED = 0.35          -- Lower = smoother but slower stick (0.25 ~ 0.45 recommended)
-local REJOIN_DELAY = 7
+local TWEEN_SPEED = 0.32          -- Smooth but tight follow
+local REJOIN_DELAY = 8.5          -- Increased for better re-execution reliability
 -- ===================================================
 
 local selectedNPC = nil
@@ -30,14 +30,14 @@ end
 local function monitorFocus()
     if focusConnection then focusConnection:Disconnect() end
     focusConnection = RunService.Heartbeat:Connect(function()
-        local currentlyActive = isWindowActive()
-        if not currentlyActive and not isPaused then
+        local active = isWindowActive()
+        if not active and not isPaused then
             isPaused = true
-            print("⚠️ Window lost focus - Pausing script")
+            print("⚠️ Window lost focus - Pausing")
             if currentTween then currentTween:Cancel() end
-        elseif currentlyActive and isPaused then
+        elseif active and isPaused then
             isPaused = false
-            print("✅ Window regained focus - Resuming script")
+            print("✅ Focus regained - Resuming")
         end
     end)
 end
@@ -67,14 +67,13 @@ local function selectTeam()
             if btn then
                 firesignal(btn.Activated)
                 waitUntil(function() return not gui:FindFirstChild("ChooseTeam") end, 8)
-                return true
+                return
             end
         else
-            return true
+            return
         end
         RunService.Heartbeat:Wait()
     end
-    return false
 end
 
 local function getCharacter()
@@ -84,13 +83,16 @@ local function getCharacter()
 end
 
 local function turnOnKen()
-    for _ = 1, 3 do
+    print("Attempting to turn ON Ken Haki...")
+    for i = 1, 6 do  -- More attempts + small delay
         if isPaused then repeat RunService.Heartbeat:Wait() until not isPaused end
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
         RunService.Heartbeat:Wait()
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        RunService.Heartbeat:Wait()
+        task.wait(0.15)
     end
+    task.wait(0.4)
+    print("Ken Haki activation sequence finished")
 end
 
 local function getDodgeCount()
@@ -104,10 +106,11 @@ local function getDodgeCount()
     return 0
 end
 
--- ===================== TARGETING (TRAINEES ONLY) =====================
+-- ===================== TRAINEE-ONLY TARGETING =====================
 local function isTrainee(enemy)
     if not enemy or not enemy.Name then return false end
-    return enemy.Name:lower():find("trainee")
+    local name = enemy.Name:lower()
+    return name:find("trainee")
 end
 
 local function findClosestTrainee(hrp)
@@ -132,17 +135,13 @@ end
 local function startTweenFollow(hrp)
     if currentTween then currentTween:Cancel() end
 
-    local tweenInfo = TweenInfo.new(TWEEN_SPEED, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
-
     spawn(function()
         while selectedNPC and getDodgeCount() > 0 and not isPaused do
             local root = selectedNPC:FindFirstChild("HumanoidRootPart")
             local hum = selectedNPC:FindFirstChild("Humanoid")
-            
             if root and hum and hum.Health > 0 then
                 local targetCFrame = root.CFrame * TELEPORT_OFFSET
-                
-                currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+                currentTween = TweenService:Create(hrp, TweenInfo.new(TWEEN_SPEED, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
                 currentTween:Play()
                 currentTween.Completed:Wait()
             else
@@ -153,54 +152,58 @@ local function startTweenFollow(hrp)
     end)
 end
 
--- ===================== REJOIN =====================
+-- ===================== REJOIN (YOUR LINK) =====================
 local function setupAutoRejoin()
     local scriptUrl = "https://raw.githubusercontent.com/timekalazar/auto-observation/refs/heads/main/script.lua"
     
     local queueCode = [[
         task.wait(]] .. REJOIN_DELAY .. [[)
-        print("=== Auto Rejoin: Loading Ken Haki Farm Script ===")
-        pcall(function()
+        print("=== Auto Rejoin: Loading your Ken Farm script ===")
+        local success, err = pcall(function()
             loadstring(game:HttpGet("]] .. scriptUrl .. [[", true))()
         end)
+        if not success then
+            warn("Rejoin load failed: " .. tostring(err))
+        else
+            print("✅ Script successfully queued and loaded")
+        end
     ]]
     
     TeleportService:SetTeleportSetting("queue_on_teleport", queueCode)
+    print("Rejoin queue has been set with your link")
 end
 
 -- ===================== START =====================
 monitorFocus()
 
 while true do
-    if isPaused then
-        repeat RunService.Heartbeat:Wait() until not isPaused
-    end
+    if isPaused then repeat RunService.Heartbeat:Wait() until not isPaused end
     
-    print("Starting new farm cycle... (Trainee Only + Tween)")
+    print("Starting new farm cycle... (Trainee Only)")
     
     selectTeam()
     local char, hrp = getCharacter()
     
     selectedNPC = findClosestTrainee(hrp)
     if not selectedNPC then
-        print("Waiting for Trainees...")
+        print("No Trainees found - waiting...")
         waitUntil(function() 
             if isPaused then return false end
             return findClosestTrainee(hrp) ~= nil 
-        end, 20)
+        end, 25)
         selectedNPC = findClosestTrainee(hrp)
     end
     
     if selectedNPC then
-        print("✅ Locked onto Trainee:", selectedNPC.Name)
+        print("✅ LOCKED onto Trainee →", selectedNPC.Name)
         hrp.CFrame = selectedNPC.HumanoidRootPart.CFrame * TELEPORT_OFFSET
     end
     
     turnOnKen()
     startTweenFollow(hrp)
     
-    print("Ken Haki Activated - Smooth Tween Farming")
-    
+    print("Farming Trainees with smooth tween...")
+
     while getDodgeCount() > 0 do
         if isPaused then
             if currentTween then currentTween:Cancel() end
@@ -210,10 +213,9 @@ while true do
         
         if not selectedNPC or not selectedNPC.Parent or 
            not selectedNPC:FindFirstChild("Humanoid") or selectedNPC.Humanoid.Health <= 0 then
-            
             selectedNPC = findClosestTrainee(hrp)
             if selectedNPC then
-                print("Switched to new Trainee:", selectedNPC.Name)
+                print("Switched to new Trainee →", selectedNPC.Name)
                 if currentTween then currentTween:Cancel() end
                 startTweenFollow(hrp)
             end
@@ -221,11 +223,12 @@ while true do
         RunService.Heartbeat:Wait()
     end
     
-    print("Dodges depleted - Rejoining...")
+    print("Dodges depleted → Preparing rejoin...")
     
     if currentTween then currentTween:Cancel() end
     setupAutoRejoin()
-    task.wait(1.8)
+    
+    task.wait(1.5)
     TeleportService:Teleport(game.PlaceId, player)
-    task.wait(5)
+    task.wait(4)  -- Reduced from 5
 end
